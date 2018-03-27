@@ -8,6 +8,9 @@ class DmhySpider(scrapy.Spider):
     allowed_domains = ['share.dmhy.org']
 
     def start_requests(self):
+        # self.logger.debug('Existing settings: %s', self.settings.attributes.keys())
+        # self.logger.debug('transmission_cfg_base_uri[%s]', self.settings.get('TRANSMISSION_CFG_BASE_URI'))
+
         # local test without redis
         with open('test/urls.txt', 'r') as urls:
             for url in urls:
@@ -23,7 +26,7 @@ class DmhySpider(scrapy.Spider):
             detail_url = item_node.xpath('link/text()').extract()[0]
             magnet_url = item_node.xpath('enclosure/@url').extract()[0]
 
-            self.logger.debug('title[%s] detail_url[%s] magnet_url[%s]', title, detail_url, magnet_url)
+            # self.logger.debug('title[%s] detail_url[%s] magnet_url[%s]', title, detail_url, magnet_url)
 
             item['title'] = title
             item['detail_url'] = detail_url
