@@ -9,7 +9,7 @@ class DmhySpider(scrapy.Spider):
 
     def start_requests(self):
         # self.logger.debug('Existing settings: %s', self.settings.attributes.keys())
-        # self.logger.debug('transmission_cfg_base_uri[%s]', self.settings.get('TRANSMISSION_CFG_BASE_URI'))
+        # self.logger.debug('transmission_cfg_base_uri[%s]', self.settings.get('TRANSMISSION_BASE_URI'))
 
         # local test without redis
         with open('test/urls.txt', 'r') as urls:
@@ -31,5 +31,6 @@ class DmhySpider(scrapy.Spider):
             item['title'] = title
             item['detail_url'] = detail_url
             item['magnet_url'] = magnet_url
+            item['parent_url'] = response.url
 
             yield item

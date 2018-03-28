@@ -14,3 +14,7 @@ class BangumiItem(scrapy.Item):
     title = scrapy.Field()
     detail_url = scrapy.Field()
     magnet_url = scrapy.Field()
+    parent_url = scrapy.Field()
+    episode = scrapy.Field()
+    revision = scrapy.Field()
+    resolution = scrapy.Field()
