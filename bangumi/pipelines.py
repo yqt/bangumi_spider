@@ -11,9 +11,36 @@ from scrapy.exceptions import DropItem
 from bangumi.transmission_rpc_client import TransmissionRpcClient
 
 
-class BangumiPipeline(object):
+class BasePipepline(object):
+
+    def json_loads_byteified(self, json_text):
+        return self._byteify(
+            json.loads(json_text, object_hook=self._byteify),
+            ignore_dicts=True
+        )
+
+    def _byteify(self, data, ignore_dicts=False):
+        # if this is a unicode string, return its string representation
+        if isinstance(data, unicode):
+            return data.encode('utf-8')
+        # if this is a list of values, return list of byteified values
+        if isinstance(data, list):
+            return [self._byteify(item, ignore_dicts=True) for item in data]
+        # if this is a dictionary, return dictionary of byteified keys and values
+        # but only if we haven't already byteified it
+        if isinstance(data, dict) and not ignore_dicts:
+            return {
+                self._byteify(key, ignore_dicts=True): self._byteify(value, ignore_dicts=True)
+                for key, value in data.iteritems()
+            }
+        # if it's anything else, return it in its original form
+        return data
+
+
+class BangumiPipeline(BasePipepline):
 
     def __init__(self, redis_host, redis_port, redis_db):
+        super(BangumiPipeline, self).__init__()
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.redis_db = redis_db
@@ -79,37 +106,16 @@ class BangumiPipeline(object):
 
         return True, episode, revision, resolution
 
-    def json_loads_byteified(self, json_text):
-        return self._byteify(
-            json.loads(json_text, object_hook=self._byteify),
-            ignore_dicts=True
-        )
 
-    def _byteify(self, data, ignore_dicts=False):
-        # if this is a unicode string, return its string representation
-        if isinstance(data, unicode):
-            return data.encode('utf-8')
-        # if this is a list of values, return list of byteified values
-        if isinstance(data, list):
-            return [self._byteify(item, ignore_dicts=True) for item in data]
-        # if this is a dictionary, return dictionary of byteified keys and values
-        # but only if we haven't already byteified it
-        if isinstance(data, dict) and not ignore_dicts:
-            return {
-                self._byteify(key, ignore_dicts=True): self._byteify(value, ignore_dicts=True)
-                for key, value in data.iteritems()
-            }
-        # if it's anything else, return it in its original form
-        return data
-
-
-class TransmissionPipeline(object):
+class TransmissionPipeline(BasePipepline):
 
     def __init__(self, base_uri, user, passwd, download_dir):
+        super(TransmissionPipeline, self).__init__()
         self.base_uri = base_uri
         self.user = user
         self.passwd = passwd
         self.download_dir = download_dir
+        self.item_list = []
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -125,13 +131,40 @@ class TransmissionPipeline(object):
             base_uri=self.base_uri, user=self.user, passwd=self.passwd, download_dir=self.download_dir,
             logger=spider.logger
         )
+        self.pool = redis.ConnectionPool(host='127.0.0.1', port=6379, db=0)
+        self.conn = redis.Redis(connection_pool=self.pool)
 
     def process_item(self, item, spider):
-        # spider.logger.debug('TransmissionPipeline item[%s]', json.dumps(dict(item), ensure_ascii=False))
-        succ = self.client.add_torrent(item['magnet_url'])
-        if not succ:
-            raise DropItem('episode [%s] add_torrent failed' % (item['title']))
-
-        # TODO: callback for tg bot
+        spider.logger.debug('TransmissionPipeline item[%s]', json.dumps(dict(item), ensure_ascii=False))
+        # NOTE: for filltering duplicated torrents
+        self.item_list.append(item)
 
         return item
+
+    def close_spider(self, spider):
+        # NOTE: filter duplicated torrent with low resulotion
+        item_map_to_add = {}
+        for item in self.item_list:
+            key = item['parent_url'] + item['episode']
+            if key in item_map_to_add:
+                existed_item = item_map_to_add[key]
+                existed_resolution = existed_item.get('resolution')
+                existed_resolution = int(existed_resolution) if existed_resolution else 0
+                current_resolution = int(item['resolution']) if item['resolution'] else 0
+                if existed_resolution >= current_resolution:
+                    continue
+            item_map_to_add[key] = item
+
+        # spider.logger.debug('item_map_to_add[%s]', item_map_to_add)
+
+        succeded_item = []
+        failed_item = []
+        for key, item in item_map_to_add.items():
+            succ = self.client.add_torrent(item['magnet_url'])
+            if not succ:
+                spider.logger.error('add torrent[%s] failed', item['title'])
+                failed_item.append(failed_item)
+            else:
+                succeded_item.append(succeded_item)
+
+        # TODO: call tg bot webhook api

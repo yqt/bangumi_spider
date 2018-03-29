@@ -91,9 +91,9 @@ ITEM_PIPELINES = {
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
 # transmission config
-TRANSMISSION_CFG_BASE_URI = ''
-TRANSMISSION_CFG_USER = ''
-TRANSMISSION_CFG_PASSWD = ''
+TRANSMISSION_BASE_URI = 'http://127.0.0.1:9091/transmission/rpc'
+TRANSMISSION_USER = ''
+TRANSMISSION_PASSWD = ''
 TRANSMISSION_DOWNLOAD_DIR = ''
 
 # redis config

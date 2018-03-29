@@ -3,6 +3,7 @@ import json
 import logging
 import urllib2
 import base64
+import re
 
 
 class TransmissionRpcClient(object):
@@ -25,7 +26,7 @@ class TransmissionRpcClient(object):
             response = urllib2.urlopen(request)
         except urllib2.HTTPError, error:
             self.session_id = error.info().getheader('X-Transmission-Session-Id')
-            logger.info('session_id[%s]' % (self.session_id))
+            self.logger.info('session_id[%s]' % (self.session_id))
 
     def get_request(self):
         request = urllib2.Request(self.base_uri)
@@ -48,15 +49,15 @@ class TransmissionRpcClient(object):
         try:
             response = urllib2.urlopen(request, data_string)
             if response.getcode() != 200:
-                logger.error('add torrnet of url[%s] failed.' % (magnet_link))
+                self.logger.error('add torrnet of url[%s] failed.' % (magnet_link))
                 return False
             response_text = response.read()
             result_data = json.loads(response_text, encoding='utf-8')
             if result_data.get('result', None) != 'success':
-                logger.error('add torrnet of url[%s] failed. result[%s]' % (magnet_link, response_text))
+                self.logger.error('add torrnet of url[%s] failed. result[%s]' % (magnet_link, response_text))
                 return False
-            logger.info('add torrnet of url[%s] success' % (magnet_link))
+            self.logger.info('add torrnet of url[%s] success' % (magnet_link))
             return True
         except urllib2.HTTPError, error:
-            logger.error('add torrnet of url[%s] failed. code[%s]' % (magnet_link, error.code))
+            self.logger.error('add torrnet of url[%s] failed. code[%s]' % (magnet_link, error.code))
             return False
