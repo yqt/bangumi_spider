@@ -66,7 +66,8 @@ ROBOTSTXT_OBEY = False
 # Configure item pipelines
 # See https://doc.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-   'bangumi.pipelines.BangumiPipeline': 300,
+    'bangumi.pipelines.BangumiPipeline': 300,
+    'bangumi.pipelines.ExternalPipeline': 400,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -100,3 +101,7 @@ TRANSMISSION_DOWNLOAD_DIR = ''
 REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 REDIS_DB = 0
+REDIS_BANGUMI_SUB_LIST_KEY = 'bangumi_sub_list'
+
+# telegram config
+TG_WEBHOOK_URI = 'http://127.0.0.1/bangumi'

@@ -9,6 +9,7 @@ import json
 import redis
 from scrapy.exceptions import DropItem
 from bangumi.transmission_rpc_client import TransmissionRpcClient
+from bangumi.tg_webhook_client import TgWebhookClient
 
 
 class BasePipepline(object):
@@ -107,14 +108,15 @@ class BangumiPipeline(BasePipepline):
         return True, episode, revision, resolution
 
 
-class TransmissionPipeline(BasePipepline):
+class ExternalPipeline(BasePipepline):
 
-    def __init__(self, base_uri, user, passwd, download_dir):
-        super(TransmissionPipeline, self).__init__()
+    def __init__(self, base_uri, user, passwd, download_dir, tg_webhook_uri):
+        super(ExternalPipeline, self).__init__()
         self.base_uri = base_uri
         self.user = user
         self.passwd = passwd
         self.download_dir = download_dir
+        self.tg_webhook_uri = tg_webhook_uri
         self.item_list = []
 
     @classmethod
@@ -123,19 +125,22 @@ class TransmissionPipeline(BasePipepline):
             base_uri=crawler.settings.get('TRANSMISSION_BASE_URI'),
             user=crawler.settings.get('TRANSMISSION_USER'),
             passwd=crawler.settings.get('TRANSMISSION_PASSWD'),
-            download_dir=crawler.settings.get('TRANSMISSION_DOWNLOAD_DIR')
+            download_dir=crawler.settings.get('TRANSMISSION_DOWNLOAD_DIR'),
+            tg_webhook_uri=crawler.settings.get('TG_WEBHOOK_URI')
         )
 
     def open_spider(self, spider):
-        self.client = TransmissionRpcClient(
+        self.transmission_client = TransmissionRpcClient(
             base_uri=self.base_uri, user=self.user, passwd=self.passwd, download_dir=self.download_dir,
             logger=spider.logger
         )
-        self.pool = redis.ConnectionPool(host='127.0.0.1', port=6379, db=0)
-        self.conn = redis.Redis(connection_pool=self.pool)
+        self.tg_webhook_client = TgWebhookClient(
+            remote_uri=self.tg_webhook_uri,
+            logger=spider.logger
+        )
 
     def process_item(self, item, spider):
-        spider.logger.debug('TransmissionPipeline item[%s]', json.dumps(dict(item), ensure_ascii=False))
+        # spider.logger.debug('ExternalPipeline item[%s]', json.dumps(dict(item), ensure_ascii=False))
         # NOTE: for filltering duplicated torrents
         self.item_list.append(item)
 
@@ -157,14 +162,19 @@ class TransmissionPipeline(BasePipepline):
 
         # spider.logger.debug('item_map_to_add[%s]', item_map_to_add)
 
-        succeded_item = []
-        failed_item = []
+        succeded_item_list = []
+        failed_item_list = []
+        latest_episode = '00'
         for key, item in item_map_to_add.items():
-            succ = self.client.add_torrent(item['magnet_url'])
+            if latest_episode < item['episode']:
+                latest_episode = item['episode']
+            succ = self.transmission_client.add_torrent(item['magnet_url'])
             if not succ:
                 spider.logger.error('add torrent[%s] failed', item['title'])
-                failed_item.append(failed_item)
+                failed_item_list.append(item)
             else:
-                succeded_item.append(succeded_item)
+                succeded_item_list.append(item)
 
-        # TODO: call tg bot webhook api
+        succ = self.tg_webhook_client.report_summary(latest_episode, succeded_item_list, failed_item_list)
+        if not succ:
+            spider.logger.error('report crawl summary failed')

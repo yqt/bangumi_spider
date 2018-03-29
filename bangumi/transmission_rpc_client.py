@@ -3,7 +3,6 @@ import json
 import logging
 import urllib2
 import base64
-import re
 
 
 class TransmissionRpcClient(object):
@@ -24,9 +23,10 @@ class TransmissionRpcClient(object):
             request = urllib2.Request(self.base_uri)
             request.add_header('Authorization', self.authorization)
             response = urllib2.urlopen(request)
-        except urllib2.HTTPError, error:
-            self.session_id = error.info().getheader('X-Transmission-Session-Id')
-            self.logger.info('session_id[%s]' % (self.session_id))
+        except Exception, error:
+            if isinstance(error, urllib2.HTTPError):
+                self.session_id = error.info().getheader('X-Transmission-Session-Id')
+                self.logger.info('session_id[%s]' % (self.session_id))
 
     def get_request(self):
         request = urllib2.Request(self.base_uri)
@@ -58,6 +58,6 @@ class TransmissionRpcClient(object):
                 return False
             self.logger.info('add torrnet of url[%s] success' % (magnet_link))
             return True
-        except urllib2.HTTPError, error:
-            self.logger.error('add torrnet of url[%s] failed. code[%s]' % (magnet_link, error.code))
+        except Exception, error:
+            self.logger.exception('add torrnet of url[%s] failed.' % (magnet_link))
             return False

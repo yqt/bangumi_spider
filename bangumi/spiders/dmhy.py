@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
+import redis
 from bangumi.items import BangumiItem
 
 
@@ -8,13 +9,23 @@ class DmhySpider(scrapy.Spider):
     allowed_domains = ['share.dmhy.org']
 
     def start_requests(self):
-        # self.logger.debug('Existing settings: %s', self.settings.attributes.keys())
-        # self.logger.debug('transmission_cfg_base_uri[%s]', self.settings.get('TRANSMISSION_BASE_URI'))
-
         # local test without redis
-        with open('test/urls.txt', 'r') as urls:
-            for url in urls:
-                yield scrapy.Request(url, callback=self.parse)
+        # with open('test/urls.txt', 'r') as urls:
+        #     for url in urls:
+        #         yield scrapy.Request(url, callback=self.parse)
+
+        # with redis
+        redis_host = self.settings.get('REDIS_HOST')
+        redis_port = self.settings.getint('REDIS_PORT')
+        redis_db = self.settings.getint('REDIS_DB', 0)
+        bangumi_sub_list = self.settings.get('REDIS_BANGUMI_SUB_LIST_KEY')
+
+        self.logger.info('redis_host[%s] redis_port[%s] redis_db[%s] bangumi_sub_list[%s]', redis_host, redis_port, redis_db, bangumi_sub_list)
+
+        conn = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+        url_list = conn.lrange(bangumi_sub_list, 0, -1)
+        for url in url_list:
+            yield scrapy.Request(url, callback=self.parse)
 
     def parse(self, response):
         # self.logger.debug('response.body[%s]', response.body)
